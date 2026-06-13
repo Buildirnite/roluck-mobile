@@ -5,6 +5,48 @@ Documento de seguimiento del proceso de publicación.
 
 ---
 
+## 🛡️ ANÁLISIS DE CUMPLIMIENTO DE POLÍTICAS (revisado 13 jun 2026)
+
+### Permisos — limpiados para evitar rechazos
+El AAB final declara SOLO permisos justificados. Se verificó en el manifiesto
+fusionado (`build/.../packaged_manifests/release/...AndroidManifest.xml`):
+
+| Permiso | Tope | Justificación |
+|---------|------|---------------|
+| CAMERA | — | Tomar foto dentro de la app |
+| INTERNET | — | Descarga de modelos ML Kit (Google Play Services) |
+| WRITE_EXTERNAL_STORAGE | ≤28 | Guardar en galería en Android antiguo |
+| READ_EXTERNAL_STORAGE | ≤32 | Idem; inerte en Android 13+ |
+| ACCESS_NETWORK_STATE, WAKE_LOCK, c2dm.RECEIVE, DYNAMIC_RECEIVER… | — | Inyectados por plugins/AndroidX/ML Kit; normales |
+
+**Cambios aplicados (AndroidManifest.xml):**
+- ❌ Quitado `READ_MEDIA_VIDEO` (la app no usa video).
+- ❌ Quitado `READ_MEDIA_IMAGES` (se usa el Photo Picker del sistema, que no
+  requiere permiso) con `tools:node="remove"`. → **Evita el formulario de
+  "Permisos de fotos y video" de Google Play**, que era el mayor riesgo.
+- 🔒 Capado `READ_EXTERNAL_STORAGE` a `maxSdkVersion=32` (`tools:replace`).
+- 🧹 Quitada la dependencia `permission_handler` (no se usaba).
+
+### Otras políticas — estado
+- **Seguridad de los datos:** la app NO recopila ni envía datos (todo on-device).
+  INTERNET solo baja modelos ML Kit; no transmite datos del usuario.
+- **Sin cuentas/login:** no aplica la política de borrado de cuenta.
+- **Selección de imágenes:** Photo Picker del sistema (acceso solo a lo que el
+  usuario elige) — alineado con la política de fotos/video.
+- **"Borrador mágico":** renombrado desde "Quitar marca de agua" para no infringir
+  la política de copyright.
+- **Contenido:** sin material sensible → clasificación apta para todos.
+
+### Monetización futura (recomendación)
+- **Preferir Google Play Billing** (compra única "Pro" o suscripción para
+  herramientas avanzadas). Mantiene la narrativa de "privacidad, sin recopilar datos".
+- **Evitar anuncios (AdMob)** salvo necesidad: los SDK de ads recopilan
+  identificadores → obligaría a cambiar Data Safety a "Sí recopila", actualizar la
+  política de privacidad y añadir consentimiento (UMP/GDPR). Rompe el diferencial
+  de privacidad. Si se hace, planificarlo aparte.
+
+---
+
 ## ✅ YA HECHO
 
 ### 1. Firma de la app (keystore)

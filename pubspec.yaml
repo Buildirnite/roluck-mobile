@@ -60,7 +60,6 @@ dependencies:
   # Galería, cámara, compartir
   image_gallery_saver_plus: ^5.0.0
   share_plus: ^10.0.0
-  permission_handler: ^11.3.0
 
   # PDF y archivos
   pdf: ^3.11.0

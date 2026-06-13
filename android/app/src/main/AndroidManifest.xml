@@ -1,9 +1,25 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Selección de imágenes vía el Photo Picker del sistema (no requiere
+         permiso de medios). Por eso NO declaramos READ_MEDIA_IMAGES y forzamos
+         su eliminación por si algún plugin la inyecta: así evitamos el formulario
+         de "Permisos de fotos y video" de Google Play. La app no usa video. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove" />
+    <!-- Guardar en galería en Android ≤ 9 (en versiones nuevas se usa MediaStore
+         sin permiso). -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Algún plugin inyecta READ_EXTERNAL_STORAGE sin tope; lo limitamos a
+         API ≤ 32 (en 33+ es inerte y usamos el Photo Picker). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" tools:replace="android:maxSdkVersion" />
+    <!-- Cámara: opción de tomar foto dentro de la app. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Internet: solo para que Google Play Services descargue los modelos ML Kit
+         on-device la primera vez. No se envían datos del usuario. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="RoLuck"
