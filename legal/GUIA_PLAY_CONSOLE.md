@@ -4,9 +4,16 @@ Guía para completar la publicación desde la consola web. Todo el material que 
 prepara desde el PC ya está listo (ver `PUBLICACION_PLAY_STORE.md`). Esta guía
 cubre solo lo que se hace en https://play.google.com/console
 
-> 💡 Sugerencia: empieza publicando en el track de **Pruebas internas** (no
-> producción). Te deja instalar la app vía Play en tu propio teléfono y corregir
-> antes de exponerla al público. Cuando todo esté bien, promueves a Producción.
+> ⚠️ REQUISITO CLAVE (verificado jun 2026): las cuentas **personales** creadas
+> después del **13 nov 2023** NO pueden publicar directamente en producción.
+> Antes deben completar una **PRUEBA CERRADA con ≥12 testers reales, opted-in,
+> durante 14 días continuos**, y luego solicitar acceso a producción.
+> - Cuentas de **organización** (entidad legal) están exentas.
+> - NO uses emuladores ni cuentas falsas como testers → riesgo de suspensión.
+> - La verificación de identidad del desarrollador es un proceso paralelo (~2 días).
+>
+> Por eso el flujo real es: Pruebas internas (para ti) → **Prueba cerrada (12
+> testers / 14 días)** → solicitar producción → Producción.
 
 ---
 
@@ -113,19 +120,33 @@ En **Probar y lanzar → Pruebas → Pruebas internas** (recomendado para empeza
 
 ---
 
-## PASO 5 — Revisar y enviar
-1. Asegúrate de que TODAS las secciones del panel estén en verde.
-2. En la versión creada, pulsa **Revisar versión** → **Iniciar lanzamiento**.
-3. Google revisa la app (suele tardar de unas horas a algunos días la primera vez).
+## PASO 5 — Prueba cerrada OBLIGATORIA (12 testers / 14 días)
+Requisito para cuentas personales creadas tras el 13 nov 2023 (tu caso).
+1. Ve a **Probar y lanzar → Pruebas → Pruebas cerradas → Crear track** (o usa
+   el de "Closed testing" por defecto).
+2. Sube el mismo AAB (o promueve el de pruebas internas).
+3. En **Testers**, crea una lista con **al menos 12 correos** de personas reales
+   que tengan un teléfono Android con su cuenta Google. Todos deben **aceptar la
+   invitación (opt-in)** desde el enlace e **instalar la app**.
+4. Mantén la prueba activa **14 días continuos** con esos 12+ testers.
+   - ⚠️ No uses emuladores ni cuentas falsas → riesgo de suspensión permanente.
+   - Consejo: pide a familiares/amigos, o únete a grupos de intercambio de testers.
+5. Cumplidos los 14 días, la consola habilitará **"Solicitar acceso a producción"**.
+
+> En paralelo: completa la **verificación de identidad** del desarrollador
+> (~2 días hábiles) si Google la pide. Ambos procesos deben terminar antes de
+> llegar a producción.
 
 ---
 
-## PASO 6 — Pasar a Producción (cuando las pruebas estén OK)
-1. Ve a **Producción → Crear versión**.
-2. Puedes **promover** la misma versión desde pruebas internas (no hay que volver
-   a subir el AAB).
-3. Selecciona países/regiones de distribución.
-4. Revisar → Iniciar lanzamiento.
+## PASO 6 — Solicitar producción y lanzar
+1. Pulsa **Solicitar acceso a producción** y completa el breve cuestionario sobre
+   tu prueba cerrada.
+2. Tras la aprobación, ve a **Producción → Crear versión**.
+3. **Promueve** la versión desde pruebas (no hay que volver a subir el AAB).
+4. Selecciona países/regiones de distribución.
+5. Asegúrate de que TODO el panel esté en verde → **Revisar** → **Iniciar
+   lanzamiento**. Google hace una revisión final (de horas a varios días).
 
 ---
 
