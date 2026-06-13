@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../core/constants/colors.dart';
 import '../../core/utils/image_utils.dart';
+import '../../core/utils/pick_image.dart';
 import '../../core/utils/save_share.dart';
 import '../../shared/widgets/image_picker_zone.dart';
 import '../../shared/widgets/image_viewer.dart';
@@ -34,6 +35,12 @@ class EditorScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Editor'),
         actions: [
+          if (state.inputFile != null)
+            IconButton(
+              onPressed: () => _pickNewImage(context, ref),
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              tooltip: 'Nueva imagen',
+            ),
           if (state.canUndo)
             IconButton(
               onPressed: () => notifier.undo(),
@@ -56,12 +63,19 @@ class EditorScreen extends ConsumerWidget {
             IconButton(
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
-                final file =
-                    await ImageUtils.saveTempFile(state.currentBytes!, 'png');
-                await ImageGallerySaverPlus.saveFile(file.path);
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Guardado en galería')),
-                );
+                try {
+                  final file =
+                      await ImageUtils.saveTempFile(state.currentBytes!, 'png');
+                  await ImageGallerySaverPlus.saveFile(file.path);
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Guardado en galería')),
+                  );
+                } catch (_) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                        content: Text('No se pudo guardar en la galería')),
+                  );
+                }
               },
               icon: const Icon(Icons.save_alt),
               tooltip: 'Guardar',
@@ -273,6 +287,39 @@ class EditorScreen extends ConsumerWidget {
               ],
             ),
     );
+  }
+
+  /// Carga una imagen nueva en el editor. Si hay ediciones aplicadas pide
+  /// confirmación, porque el historial se descarta al cambiar de imagen.
+  Future<void> _pickNewImage(BuildContext context, WidgetRef ref) async {
+    final state = ref.read(editorProvider);
+    final notifier = ref.read(editorProvider.notifier);
+
+    if (state.steps.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('¿Cambiar de imagen?'),
+          content: const Text(
+              'Se descartarán las ediciones de la imagen actual.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Cambiar',
+                  style: TextStyle(color: AppColors.accent)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    final file = await pickImageWithSheet(context);
+    if (file != null) await notifier.setInput(file);
   }
 
   Widget _buildToolPanel(EditorTool tool) {

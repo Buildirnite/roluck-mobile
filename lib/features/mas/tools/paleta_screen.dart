@@ -189,12 +189,35 @@ class _PaletaScreenState extends State<PaletaScreen> {
                 ),
               const SizedBox(height: 20),
               // Paleta de colores dominantes.
-              const Text(
-                'Colores dominantes',
-                style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Colores dominantes',
+                    style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  if (_colors != null && _colors!.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        final all =
+                            _colors!.map(_colorToHex).join(', ');
+                        Clipboard.setData(ClipboardData(text: all));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text(
+                                  'Paleta copiada (${_colors!.length} colores)')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 14),
+                      label: const Text('Copiar todos',
+                          style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.accent),
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               const Text(

@@ -61,14 +61,20 @@ class _PdfAImagenesScreenState extends State<PdfAImagenesScreen> {
 
   Future<void> _saveAll() async {
     final messenger = ScaffoldMessenger.of(context);
+    var saved = 0;
     for (final page in _pages) {
-      final file = await ImageUtils.saveTempFile(page, 'png');
-      await ImageGallerySaverPlus.saveFile(file.path);
+      try {
+        final file = await ImageUtils.saveTempFile(page, 'png');
+        await ImageGallerySaverPlus.saveFile(file.path);
+        saved++;
+      } catch (_) {
+        // Se omite la página que falló y se continúa con las demás.
+      }
     }
-    if (mounted) {
-      messenger.showSnackBar(SnackBar(
-          content: Text('${_pages.length} páginas guardadas en galería')));
-    }
+    messenger.showSnackBar(SnackBar(
+        content: Text(saved == _pages.length
+            ? '$saved páginas guardadas en galería'
+            : '$saved de ${_pages.length} páginas guardadas')));
   }
 
   Future<void> _shareAll() async {

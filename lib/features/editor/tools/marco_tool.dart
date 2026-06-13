@@ -22,6 +22,9 @@ class _MarcoToolPanelState extends ConsumerState<MarcoToolPanel> {
     'Blanco': Colors.white,
     'Negro': Colors.black,
     'Lima': AppColors.accent,
+    'Gris': Color(0xFF9E9E9E),
+    'Rojo': Color(0xFFE53935),
+    'Azul': Color(0xFF2196F3),
   };
 
   Future<void> _applyBorder() async {

@@ -47,9 +47,31 @@ class LoteScreen extends ConsumerWidget {
                 label: const Text('Seleccionar imágenes'),
               )
             else ...[
-              Text(
-                '${state.inputFiles.length} imágenes seleccionadas',
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${state.inputFiles.length} imágenes seleccionadas',
+                    style: const TextStyle(
+                        color: AppColors.textPrimary, fontSize: 16),
+                  ),
+                  TextButton.icon(
+                    onPressed: state.isProcessing
+                        ? null
+                        : () async {
+                            final picker = ImagePicker();
+                            final picked = await picker.pickMultiImage();
+                            if (picked.isNotEmpty) {
+                              notifier.addFiles(
+                                  picked.map((x) => File(x.path)).toList());
+                            }
+                          },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Añadir'),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppColors.accent),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -86,9 +108,9 @@ class LoteScreen extends ConsumerWidget {
                 ),
                 Slider(
                   value: state.quality.toDouble(),
-                  min: 0,
+                  min: 1,
                   max: 100,
-                  divisions: 100,
+                  divisions: 99,
                   activeColor: AppColors.accent,
                   inactiveColor: AppColors.bgElevated,
                   onChanged: (v) => notifier.setQuality(v.round()),
@@ -121,8 +143,12 @@ class LoteScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
 
-              // Lista de items
-              BatchList(items: state.items),
+              // Lista de items (con ✕ para quitar los que siguen en cola)
+              BatchList(
+                items: state.items,
+                onRemove:
+                    state.isProcessing ? null : (i) => notifier.removeAt(i),
+              ),
               const SizedBox(height: 16),
 
               // Botón procesar

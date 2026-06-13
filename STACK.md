@@ -1,7 +1,9 @@
 # RoLuck Convertidor — Stack y estado del proyecto
 
 > Resumen de todo lo que usa la app, su estado y los pendientes.
-> Última actualización: **2026-06-06**
+> Última actualización: **2026-06-12**
+> Para el resumen de funcionalidades y arquitectura actual, ver **README.md**
+> (las secciones 4 y 7 de este archivo quedaron como referencia histórica).
 
 App móvil **RoLuck Convertidor** — convertidor/editor de imágenes en Flutter
 para Android. Tema oscuro (#0A0A0A) con acento verde lima (#A3E635) y tipografía
@@ -118,21 +120,17 @@ Operaciones en `lib/core/utils/image_ops.dart`.
 - No requiere Rust (binarios precompilados vía `flutter_avif_android`).
 - Añadió `flutter_cache_manager`, `http` y otras transitivas.
 
-### 5.2 Quitar fondo → **requiere decisión**
-Candidatos evaluados:
+### 5.2 Quitar fondo → ✅ **INTEGRADO** (`google_mlkit_subject_segmentation` 0.0.3)
+- Segmentación de sujeto general (no solo personas), on-device.
+- La primera vez descarga el modelo (necesita conexión una vez).
+- ⚠️ Crashea en emulador; funciona en dispositivo físico.
+- Reglas R8 (`-keep`/`-dontwarn com.google.mlkit`) en
+  `android/app/proguard-rules.pro`.
 
-| Paquete | Alcance | Peso | Compatibilidad con stack actual |
-|---|---|---|---|
-| `image_background_remover` 2.0.0 | Objetos generales (ONNX) | ~+30 MB | ❌ **No resuelve**: el dry-run baja a la 0.0.5 (antigua). La 2.0.0 exige dependencias/SDK más nuevos. |
-| `google_mlkit_selfie_segmentation` 0.10.1 | Solo personas/selfies | ligero | ✅ Encaja (ya usamos ML Kit) |
-| `local_rembg` | Objetos (nativo) | medio | por evaluar |
-
-- **Conclusión:** no hay opción "general + compatible + actual" sin tocar el
-  resto de dependencias. Dos caminos:
-  1. **Personas:** integrar `google_mlkit_selfie_segmentation` ya (rápido,
-     liviano) si el caso de uso son retratos.
-  2. **Objetos generales:** adoptar `image_background_remover` 2.0.0, lo que
-     implica subir dependencias/SDK (migración) y asumir ~+30 MB de tamaño.
+### 5.3 Más paquetes ML Kit integrados después de este análisis
+`google_mlkit_barcode_scanning`, `google_mlkit_face_detection`,
+`google_mlkit_image_labeling` (commons ^0.11) y `qr_flutter` para generar QR.
+El APK release pesa ~98 MB por las libs nativas.
 
 ---
 

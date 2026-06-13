@@ -55,7 +55,17 @@ class _ExifScreenState extends State<ExifScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: Image.file(_image!, height: 150, fit: BoxFit.cover),
               ),
-              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => setState(() {
+                          _image = null;
+                          _exifData = null;
+                        }),
+                child: const Text('Otra imagen',
+                    style: TextStyle(color: AppColors.accent)),
+              ),
+              const SizedBox(height: 4),
               if (_isLoading)
                 const Center(child: CircularProgressIndicator(color: AppColors.accent))
               else if (_exifData != null) ...[

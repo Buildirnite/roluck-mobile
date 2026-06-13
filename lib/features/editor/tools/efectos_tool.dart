@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +8,8 @@ import '../editor_provider.dart';
 import '../widgets/tool_action_button.dart';
 import '../widgets/tool_panel_container.dart';
 
-/// Panel de Efectos: nitidez, viñeta y pixelado.
+/// Panel de Efectos: nitidez, viñeta y pixelado. El pixelado tiene vista previa
+/// en vivo (sobre una versión reducida, escalando el tamaño del bloque).
 class EfectosToolPanel extends ConsumerStatefulWidget {
   const EfectosToolPanel({super.key});
 
@@ -18,6 +20,65 @@ class EfectosToolPanel extends ConsumerStatefulWidget {
 class _EfectosToolPanelState extends ConsumerState<EfectosToolPanel> {
   double _pixelSize = 12;
 
+  // Imagen base al abrir el panel y su versión reducida para la previa.
+  Uint8List? _base;
+  Uint8List? _baseSmall;
+  // Factor (lado reducido / lado completo) para escalar el tamaño de bloque.
+  double _previewScale = 1;
+
+  // Control de concurrencia de la previa.
+  bool _previewing = false;
+  bool _previewDirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void dispose() {
+    ref.read(editorProvider.notifier).clearPreview();
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    _base = ref.read(editorProvider).currentBytes;
+    if (_base == null) return;
+    final dims = await compute(imageDimensionsOp, _base!);
+    final small =
+        await compute(downscalePngOp, {'bytes': _base!, 'maxDim': 720});
+    final smallDims = await compute(imageDimensionsOp, small);
+    if (!mounted) return;
+    final longest = max(dims[0], dims[1]);
+    final smallLongest = max(smallDims[0], smallDims[1]);
+    setState(() {
+      _baseSmall = small;
+      _previewScale = longest == 0 ? 1 : smallLongest / longest;
+    });
+  }
+
+  /// Previa del pixelado sobre la versión reducida, sin solaparse.
+  Future<void> _schedulePixelPreview() async {
+    final small = _baseSmall;
+    if (small == null) return;
+    if (_previewing) {
+      _previewDirty = true;
+      return;
+    }
+    _previewing = true;
+    final notifier = ref.read(editorProvider.notifier);
+    do {
+      _previewDirty = false;
+      final size = max(2, (_pixelSize * _previewScale).round());
+      final result =
+          await compute(pixelateImageOp, {'bytes': small, 'size': size});
+      if (!mounted) break;
+      notifier.setPreview(result);
+    } while (_previewDirty);
+    _previewing = false;
+  }
+
   Future<void> _run(String name, Future<Uint8List> Function(Uint8List) op) async {
     final notifier = ref.read(editorProvider.notifier);
     final bytes = ref.read(editorProvider).currentBytes;
@@ -26,15 +87,20 @@ class _EfectosToolPanelState extends ConsumerState<EfectosToolPanel> {
     final result = await op(bytes);
     notifier.setProcessing(false);
     notifier.applyEdit(name, result);
+    // La imagen actual cambió: la siguiente previa debe partir del resultado.
+    if (!mounted) return;
+    setState(() => _baseSmall = null);
+    _init();
   }
 
   @override
   Widget build(BuildContext context) {
     final isProcessing = ref.watch(editorProvider).isProcessing;
+    final ready = _baseSmall != null;
 
     return ToolPanelContainer(
       title: 'Efectos',
-      icon: Icons.auto_fix_high,
+      icon: Icons.grain,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -79,13 +145,17 @@ class _EfectosToolPanelState extends ConsumerState<EfectosToolPanel> {
             activeColor: AppColors.accent,
             inactiveColor: AppColors.bgElevated,
             label: '${_pixelSize.round()}',
-            onChanged:
-                isProcessing ? null : (v) => setState(() => _pixelSize = v),
+            onChanged: (isProcessing || !ready)
+                ? null
+                : (v) {
+                    setState(() => _pixelSize = v);
+                    _schedulePixelPreview();
+                  },
           ),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: isProcessing
+              onPressed: (isProcessing || !ready)
                   ? null
                   : () => _run(
                         'Pixelado ${_pixelSize.round()}',

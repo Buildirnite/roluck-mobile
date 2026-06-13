@@ -40,7 +40,7 @@ class PdfScreen extends ConsumerWidget {
                 final picker = ImagePicker();
                 final picked = await picker.pickMultiImage();
                 if (picked.isNotEmpty) {
-                  notifier.setImages(picked.map((x) => File(x.path)).toList());
+                  notifier.addImages(picked.map((x) => File(x.path)).toList());
                 }
               },
               icon: const Icon(Icons.add_photo_alternate),
@@ -128,19 +128,8 @@ class PdfScreen extends ConsumerWidget {
               const SizedBox(height: 16),
 
               // Nombre
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Nombre del archivo',
-                  labelStyle: const TextStyle(color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.bgElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-                style: const TextStyle(color: AppColors.textPrimary),
-                controller: TextEditingController(text: state.fileName),
+              _FileNameField(
+                initialValue: state.fileName,
                 onChanged: notifier.setFileName,
               ),
               const SizedBox(height: 16),
@@ -259,6 +248,47 @@ class PdfScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Campo del nombre del archivo con su propio controlador persistente: si se
+/// recreara en cada rebuild, el cursor saltaría al inicio con cada letra.
+class _FileNameField extends StatefulWidget {
+  final String initialValue;
+  final ValueChanged<String> onChanged;
+  const _FileNameField({required this.initialValue, required this.onChanged});
+
+  @override
+  State<_FileNameField> createState() => _FileNameFieldState();
+}
+
+class _FileNameFieldState extends State<_FileNameField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialValue);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      decoration: InputDecoration(
+        labelText: 'Nombre del archivo',
+        labelStyle: const TextStyle(color: AppColors.textMuted),
+        filled: true,
+        fillColor: AppColors.bgElevated,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      style: const TextStyle(color: AppColors.textPrimary),
+      controller: _controller,
+      onChanged: widget.onChanged,
     );
   }
 }

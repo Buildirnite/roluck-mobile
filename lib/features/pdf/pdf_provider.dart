@@ -56,6 +56,10 @@ class PdfNotifier extends StateNotifier<PdfState> {
 
   void setImages(List<File> files) => state = state.copyWith(images: files);
 
+  /// Agrega imágenes al final de la lista actual (no reemplaza).
+  void addImages(List<File> files) =>
+      state = state.copyWith(images: [...state.images, ...files]);
+
   void reorder(int oldIndex, int newIndex) {
     final list = List<File>.from(state.images);
     final item = list.removeAt(oldIndex);

@@ -52,7 +52,17 @@ class _OcrScreenState extends State<OcrScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: Image.file(_image!, height: 200, fit: BoxFit.cover),
               ),
-              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () => setState(() {
+                          _image = null;
+                          _extractedText = null;
+                        }),
+                child: const Text('Otra imagen',
+                    style: TextStyle(color: AppColors.accent)),
+              ),
+              const SizedBox(height: 4),
               if (_isProcessing)
                 const Center(child: CircularProgressIndicator(color: AppColors.accent))
               else if (_extractedText != null) ...[

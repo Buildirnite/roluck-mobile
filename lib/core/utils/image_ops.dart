@@ -49,6 +49,9 @@ Uint8List filterImageOp(Map<String, dynamic> args) {
       out = img.sepia(decoded);
     case 'invert':
       out = img.invert(decoded);
+    case 'normalize':
+      // Auto-mejora: estira el histograma al rango completo (más contraste).
+      out = img.normalize(decoded, min: 0, max: 255);
     case 'brightnessUp':
       out = img.adjustColor(decoded, brightness: 1.15);
     case 'brightnessDown':
@@ -105,12 +108,14 @@ Uint8List compressImageOp(Map<String, dynamic> args) {
 }
 
 /// Estampa un texto como marca de agua. `position` admite: topLeft, topRight,
-/// bottomLeft, bottomRight, center. `size` admite: s, m, l.
+/// bottomLeft, bottomRight, center. `size` admite: s, m, l. `opacity` (0..1)
+/// regula la opacidad del texto (por defecto 0.9).
 Uint8List watermarkImageOp(Map<String, dynamic> args) {
   final bytes = args['bytes'] as Uint8List;
   final text = args['text'] as String;
   final position = args['position'] as String;
   final size = args['size'] as String;
+  final opacity = ((args['opacity'] as num?) ?? 0.9).toDouble();
   final decoded = img.decodeImage(bytes);
   if (decoded == null) return bytes;
 
@@ -140,10 +145,12 @@ Uint8List watermarkImageOp(Map<String, dynamic> args) {
   };
 
   // Sombra sutil para legibilidad sobre fondos claros, y el texto en blanco.
+  final textA = (255 * opacity).round().clamp(0, 255);
+  final shadowA = (textA * 0.6).round();
   img.drawString(decoded, text,
-      font: font, x: x + 2, y: y + 2, color: img.ColorRgba8(0, 0, 0, 140));
+      font: font, x: x + 2, y: y + 2, color: img.ColorRgba8(0, 0, 0, shadowA));
   img.drawString(decoded, text,
-      font: font, x: x, y: y, color: img.ColorRgba8(255, 255, 255, 230));
+      font: font, x: x, y: y, color: img.ColorRgba8(255, 255, 255, textA));
 
   return Uint8List.fromList(img.encodePng(decoded));
 }
@@ -248,6 +255,63 @@ Uint8List blurRegionsOp(Map<String, dynamic> args) {
     final radius = (max(w, h) / 5).round().clamp(3, 60);
     final blurred = img.gaussianBlur(region, radius: radius);
     img.compositeImage(decoded, blurred, dstX: x, dstY: y);
+  }
+  return Uint8List.fromList(img.encodePng(decoded));
+}
+
+/// Rellena las regiones indicadas (cada una [x, y, w, h] en píxeles)
+/// interpolando los colores del borde exterior de cada región (inpainting
+/// suave) y difuminando ligeramente el resultado. Sirve para borrar marcas de
+/// agua, logos o texto sobre fondos razonablemente uniformes.
+Uint8List inpaintRegionsOp(Map<String, dynamic> args) {
+  final bytes = args['bytes'] as Uint8List;
+  final rects = (args['rects'] as List).cast<List>();
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return bytes;
+
+  for (final r in rects) {
+    var x = (r[0] as num).round();
+    var y = (r[1] as num).round();
+    var w = (r[2] as num).round();
+    var h = (r[3] as num).round();
+    x = x.clamp(0, decoded.width - 1);
+    y = y.clamp(0, decoded.height - 1);
+    w = w.clamp(1, decoded.width - x);
+    h = h.clamp(1, decoded.height - y);
+
+    // Columnas/filas justo fuera de la región, de donde se toman los colores.
+    final left = x - 1, right = x + w, top = y - 1, bottom = y + h;
+    final hasL = left >= 0, hasR = right < decoded.width;
+    final hasT = top >= 0, hasB = bottom < decoded.height;
+
+    for (var py = y; py < y + h; py++) {
+      for (var px = x; px < x + w; px++) {
+        double sr = 0, sg = 0, sb = 0, sw = 0;
+        void add(int sx, int sy, double weight) {
+          final p = decoded.getPixel(sx, sy);
+          sr += p.r * weight;
+          sg += p.g * weight;
+          sb += p.b * weight;
+          sw += weight;
+        }
+
+        // Peso inverso a la distancia a cada borde disponible.
+        if (hasL) add(left, py, 1.0 / (px - left));
+        if (hasR) add(right, py, 1.0 / (right - px));
+        if (hasT) add(px, top, 1.0 / (py - top));
+        if (hasB) add(px, bottom, 1.0 / (bottom - py));
+        if (sw == 0) continue;
+        decoded.setPixelRgba(px, py, (sr / sw).round(), (sg / sw).round(),
+            (sb / sw).round(), 255);
+      }
+    }
+
+    // Difuminado leve solo de la zona rellenada, para disimular el degradado.
+    if (w > 8 && h > 8) {
+      final region = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+      final blurred = img.gaussianBlur(region, radius: 3);
+      img.compositeImage(decoded, blurred, dstX: x, dstY: y);
+    }
   }
   return Uint8List.fromList(img.encodePng(decoded));
 }
@@ -389,6 +453,47 @@ Uint8List stitchImagesOp(Map<String, dynamic> args) {
     }
     return Uint8List.fromList(img.encodePng(canvas));
   }
+}
+
+/// Compone un collage en cuadrícula: celdas cuadradas de [cellSize] px,
+/// [cols] columnas, separadas (y rodeadas) por [spacing] px. El fondo [bg]
+/// admite: white, black, transparent.
+Uint8List collageOp(Map<String, dynamic> args) {
+  final frames = (args['frames'] as List).cast<Uint8List>();
+  final cols = args['cols'] as int;
+  final cellSize = args['cellSize'] as int;
+  final spacing = args['spacing'] as int;
+  final bg = args['bg'] as String;
+
+  final decoded = <img.Image>[];
+  for (final b in frames) {
+    final d = img.decodeImage(b);
+    if (d != null) decoded.add(d);
+  }
+  if (decoded.isEmpty) return Uint8List(0);
+
+  final resized = decoded
+      .map((i) => img.copyResize(i, width: cellSize, height: cellSize))
+      .toList();
+  final rows = (resized.length / cols).ceil();
+  final canvas = img.Image(
+    width: cellSize * cols + spacing * (cols + 1),
+    height: cellSize * rows + spacing * (rows + 1),
+    numChannels: 4,
+  );
+  final color = switch (bg) {
+    'black' => img.ColorRgba8(0, 0, 0, 255),
+    'transparent' => img.ColorRgba8(0, 0, 0, 0),
+    _ => img.ColorRgba8(255, 255, 255, 255),
+  };
+  img.fill(canvas, color: color);
+
+  for (var i = 0; i < resized.length; i++) {
+    final x = spacing + (i % cols) * (cellSize + spacing);
+    final y = spacing + (i ~/ cols) * (cellSize + spacing);
+    img.compositeImage(canvas, resized[i], dstX: x, dstY: y);
+  }
+  return Uint8List.fromList(img.encodePng(canvas));
 }
 
 /// Devuelve las dimensiones [width, height] de la imagen sin modificarla.

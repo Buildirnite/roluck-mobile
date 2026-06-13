@@ -17,6 +17,7 @@ import '../features/mas/tools/limpiar_exif_screen.dart';
 import '../features/mas/tools/pdf_a_imagenes_screen.dart';
 import '../features/mas/tools/imagen_larga_screen.dart';
 import '../features/mas/tools/marca_agua_logo_screen.dart';
+import '../features/mas/tools/quitar_marca_screen.dart';
 import '../features/mas/tools/qr_scanner_screen.dart';
 import '../features/mas/tools/qr_generator_screen.dart';
 import '../features/mas/tools/difuminar_caras_screen.dart';
@@ -48,6 +49,7 @@ final appRouter = GoRouter(
     GoRoute(path: '/mas/pdf-a-imagenes', builder: (c, s) => const PdfAImagenesScreen()),
     GoRoute(path: '/mas/imagen-larga', builder: (c, s) => const ImagenLargaScreen()),
     GoRoute(path: '/mas/marca-agua-logo', builder: (c, s) => const MarcaAguaLogoScreen()),
+    GoRoute(path: '/mas/quitar-marca', builder: (c, s) => const QuitarMarcaScreen()),
     GoRoute(path: '/mas/qr-escanear', builder: (c, s) => const QrScannerScreen()),
     GoRoute(path: '/mas/qr-generar', builder: (c, s) => const QrGeneratorScreen()),
     GoRoute(path: '/mas/difuminar-caras', builder: (c, s) => const DifuminarCarasScreen()),

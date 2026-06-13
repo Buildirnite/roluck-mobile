@@ -19,6 +19,30 @@ class CompressToolPanel extends ConsumerStatefulWidget {
 class _CompressToolPanelState extends ConsumerState<CompressToolPanel> {
   double _quality = 80;
 
+  // Peso estimado del resultado con la calidad actual (se calcula al soltar el
+  // slider). El contador de secuencia descarta estimaciones obsoletas.
+  int? _estimatedSize;
+  int _estimateSeq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _estimate();
+  }
+
+  Future<void> _estimate() async {
+    final bytes = ref.read(editorProvider).currentBytes;
+    if (bytes == null) return;
+    final seq = ++_estimateSeq;
+    final result = await compute(compressImageOp, {
+      'bytes': bytes,
+      'quality': _quality.round(),
+    });
+    if (mounted && seq == _estimateSeq) {
+      setState(() => _estimatedSize = result.length);
+    }
+  }
+
   Future<void> _apply() async {
     final notifier = ref.read(editorProvider.notifier);
     final bytes = ref.read(editorProvider).currentBytes;
@@ -34,6 +58,8 @@ class _CompressToolPanelState extends ConsumerState<CompressToolPanel> {
       'JPEG ${_quality.round()}% · ${ImageUtils.formatFileSize(result.length)}',
       result,
     );
+    // La imagen actual cambió: recalcular la estimación sobre la nueva base.
+    if (mounted) _estimate();
   }
 
   @override
@@ -48,8 +74,20 @@ class _CompressToolPanelState extends ConsumerState<CompressToolPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tamaño actual: ${ImageUtils.formatFileSize(currentSize)}',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Actual: ${ImageUtils.formatFileSize(currentSize)}',
+                  style: const TextStyle(
+                      color: AppColors.textMuted, fontSize: 13)),
+              Text(
+                _estimatedSize == null
+                    ? 'Calculando…'
+                    : 'Resultado ≈ ${ImageUtils.formatFileSize(_estimatedSize!)}',
+                style: const TextStyle(color: AppColors.accent, fontSize: 13),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -69,8 +107,13 @@ class _CompressToolPanelState extends ConsumerState<CompressToolPanel> {
             divisions: 18,
             activeColor: AppColors.accent,
             label: '${_quality.round()}%',
-            onChanged:
-                isProcessing ? null : (v) => setState(() => _quality = v),
+            onChanged: isProcessing
+                ? null
+                : (v) => setState(() {
+                      _quality = v;
+                      _estimatedSize = null;
+                    }),
+            onChangeEnd: (_) => _estimate(),
           ),
           SizedBox(
             width: double.infinity,

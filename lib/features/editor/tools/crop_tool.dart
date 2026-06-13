@@ -34,6 +34,14 @@ class CropToolPanel extends ConsumerWidget {
           statusBarLight: false,
           initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
+          // Proporciones rápidas en la barra del recortador.
+          aspectRatioPresets: const [
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.ratio4x3,
+            CropAspectRatioPreset.ratio3x2,
+            CropAspectRatioPreset.ratio16x9,
+          ],
         ),
       ],
     );

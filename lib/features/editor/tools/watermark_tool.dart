@@ -18,6 +18,7 @@ class _WatermarkToolPanelState extends ConsumerState<WatermarkToolPanel> {
   final _textCtrl = TextEditingController(text: 'RoLuck');
   String _position = 'bottomRight';
   String _size = 'm';
+  double _opacity = 90; // %
 
   static const _positions = {
     'topLeft': 'Sup. izq.',
@@ -47,6 +48,7 @@ class _WatermarkToolPanelState extends ConsumerState<WatermarkToolPanel> {
       'text': text,
       'position': _position,
       'size': _size,
+      'opacity': _opacity / 100.0,
     });
     notifier.setProcessing(false);
     notifier.applyEdit('Marca de agua', result);
@@ -131,6 +133,30 @@ class _WatermarkToolPanelState extends ConsumerState<WatermarkToolPanel> {
             ],
           ),
           const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Opacidad',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+              Text('${_opacity.round()}%',
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  )),
+            ],
+          ),
+          Slider(
+            value: _opacity,
+            min: 10,
+            max: 100,
+            divisions: 18,
+            activeColor: AppColors.accent,
+            inactiveColor: AppColors.bgElevated,
+            label: '${_opacity.round()}%',
+            onChanged:
+                isProcessing ? null : (v) => setState(() => _opacity = v),
+          ),
+          const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 
@@ -7,14 +8,19 @@ class BatchItem {
   final String name;
   final BatchItemStatus status;
   final String? errorMessage;
+  // Ruta del archivo para mostrar su miniatura (opcional).
+  final String? path;
 
-  const BatchItem({required this.name, required this.status, this.errorMessage});
+  const BatchItem(
+      {required this.name, required this.status, this.errorMessage, this.path});
 }
 
 class BatchList extends StatelessWidget {
   final List<BatchItem> items;
+  // Si se pasa, los ítems en cola muestran una ✕ para quitarlos de la lista.
+  final void Function(int index)? onRemove;
 
-  const BatchList({super.key, required this.items});
+  const BatchList({super.key, required this.items, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +39,14 @@ class BatchList extends StatelessWidget {
           ),
           child: Row(
             children: [
+              if (item.path != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.file(File(item.path!),
+                      width: 36, height: 36, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 10),
+              ],
               _statusIcon(item.status),
               const SizedBox(width: 10),
               Expanded(
@@ -49,6 +63,19 @@ class BatchList extends StatelessWidget {
                   fontSize: 12,
                 ),
               ),
+              if (onRemove != null && item.status == BatchItemStatus.queued)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: InkWell(
+                    onTap: () => onRemove!(index),
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close,
+                          size: 16, color: AppColors.textMuted),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

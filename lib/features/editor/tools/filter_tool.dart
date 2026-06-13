@@ -7,45 +7,68 @@ import '../editor_provider.dart';
 import '../widgets/tool_panel_container.dart';
 
 /// Cómo se comporta un filtro al repetirlo:
-/// - [accumulate]: cada toque suma efecto (brillo, contraste, saturación).
-/// - [idempotent]: repetirlo no cambia nada (grises, sepia) → se ignora.
+/// - [idempotent]: repetirlo no cambia nada (grises, sepia, auto) → se ignora.
 /// - [selfInverse]: aplicarlo dos veces vuelve al original (invertir) → cancela.
-enum _FilterKind { accumulate, idempotent, selfInverse }
+enum _FilterKind { idempotent, selfInverse }
 
 class _Filter {
   final String id;
   final String label;
-  final IconData icon;
   final _FilterKind kind;
-  const _Filter(this.id, this.label, this.icon,
-      {this.kind = _FilterKind.accumulate});
+  const _Filter(this.id, this.label, {this.kind = _FilterKind.idempotent});
 }
 
 const _filters = [
-  _Filter('grayscale', 'Grises', Icons.gradient, kind: _FilterKind.idempotent),
-  _Filter('sepia', 'Sepia', Icons.filter_vintage, kind: _FilterKind.idempotent),
-  _Filter('invert', 'Invertir', Icons.invert_colors,
-      kind: _FilterKind.selfInverse),
+  _Filter('normalize', 'Auto'),
+  _Filter('grayscale', 'Grises'),
+  _Filter('sepia', 'Sepia'),
+  _Filter('invert', 'Invertir', kind: _FilterKind.selfInverse),
 ];
 
-/// Panel de Filtros: efectos de color de un toque. Grises/Sepia no se repiten
-/// (idempotentes) e Invertir se cancela a sí mismo. Brillo, contraste y
-/// saturación están ahora en la herramienta Ajustes (con sliders).
-class FilterToolPanel extends ConsumerWidget {
+/// Panel de Filtros: cada filtro se muestra como una miniatura de la imagen
+/// actual con el filtro ya aplicado, para elegir viendo el resultado.
+class FilterToolPanel extends ConsumerStatefulWidget {
   const FilterToolPanel({super.key});
 
-  Future<void> _apply(BuildContext context, WidgetRef ref, _Filter f) async {
+  @override
+  ConsumerState<FilterToolPanel> createState() => _FilterToolPanelState();
+}
+
+class _FilterToolPanelState extends ConsumerState<FilterToolPanel> {
+  Map<String, Uint8List>? _thumbs;
+
+  @override
+  void initState() {
+    super.initState();
+    _buildThumbs();
+  }
+
+  Future<void> _buildThumbs() async {
+    final bytes = ref.read(editorProvider).currentBytes;
+    if (bytes == null) return;
+    final small = await compute(downscalePngOp, {'bytes': bytes, 'maxDim': 200});
+    final thumbs = <String, Uint8List>{};
+    for (final f in _filters) {
+      thumbs[f.id] =
+          await compute(filterImageOp, {'bytes': small, 'filter': f.id});
+    }
+    if (mounted) setState(() => _thumbs = thumbs);
+  }
+
+  Future<void> _apply(_Filter f) async {
     final notifier = ref.read(editorProvider.notifier);
     final opKey = 'filter:${f.id}';
 
     // Invertir es su propia inversa: aplicarlo justo después se cancela.
     if (f.kind == _FilterKind.selfInverse && notifier.cancelsLastStep(opKey)) {
       notifier.discardLastStep();
+      setState(() => _thumbs = null);
+      _buildThumbs();
       return;
     }
 
-    // Grises/Sepia: si el último paso ya fue este mismo filtro, repetirlo no
-    // cambia la imagen; evitamos pasos inútiles en el historial.
+    // Idempotentes: si el último paso ya fue este filtro, repetirlo no cambia
+    // la imagen; evitamos pasos inútiles en el historial.
     if (f.kind == _FilterKind.idempotent &&
         ref.read(editorProvider).lastOpKey == opKey) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -64,29 +87,60 @@ class FilterToolPanel extends ConsumerWidget {
     });
     notifier.setProcessing(false);
     notifier.applyEdit(f.label, result, opKey: opKey);
+
+    // La imagen actual cambió: regenerar las miniaturas sobre el resultado.
+    if (!mounted) return;
+    setState(() => _thumbs = null);
+    _buildThumbs();
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isProcessing = ref.watch(editorProvider).isProcessing;
+    final thumbs = _thumbs;
 
     return ToolPanelContainer(
       title: 'Filtros',
-      icon: Icons.tune,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: _filters.map((f) {
-          return ActionChip(
-            avatar: Icon(f.icon, size: 16, color: AppColors.accent),
-            label: Text(f.label),
-            labelStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-            backgroundColor: AppColors.bgElevated,
-            side: const BorderSide(color: AppColors.border),
-            onPressed: isProcessing ? null : () => _apply(context, ref, f),
-          );
-        }).toList(),
-      ),
+      icon: Icons.auto_awesome,
+      child: thumbs == null
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                  child: CircularProgressIndicator(color: AppColors.accent)),
+            )
+          : SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _filters.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, i) {
+                  final f = _filters[i];
+                  final thumb = thumbs[f.id];
+                  return GestureDetector(
+                    onTap: isProcessing ? null : () => _apply(f),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: thumb == null
+                              ? const SizedBox(width: 72, height: 72)
+                              : Image.memory(thumb,
+                                  width: 72, height: 72, fit: BoxFit.cover),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          f.label,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

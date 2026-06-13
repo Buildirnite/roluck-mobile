@@ -62,8 +62,34 @@ class LoteNotifier extends StateNotifier<LoteState> {
           .map((f) => BatchItem(
                 name: p.basename(f.path),
                 status: BatchItemStatus.queued,
+                path: f.path,
               ))
           .toList(),
+    );
+  }
+
+  /// Añade imágenes a la selección actual (quedan en cola para procesar).
+  void addFiles(List<File> files) {
+    if (files.isEmpty) return;
+    state = state.copyWith(
+      inputFiles: [...state.inputFiles, ...files],
+      items: [
+        ...state.items,
+        ...files.map((f) => BatchItem(
+              name: p.basename(f.path),
+              status: BatchItemStatus.queued,
+              path: f.path,
+            )),
+      ],
+    );
+  }
+
+  /// Quita una imagen (y su ítem de estado) de la lista.
+  void removeAt(int index) {
+    if (index < 0 || index >= state.inputFiles.length) return;
+    state = state.copyWith(
+      inputFiles: List<File>.from(state.inputFiles)..removeAt(index),
+      items: List<BatchItem>.from(state.items)..removeAt(index),
     );
   }
 
@@ -132,6 +158,7 @@ class LoteNotifier extends StateNotifier<LoteState> {
       updatedItems[i] = BatchItem(
         name: updatedItems[i].name,
         status: BatchItemStatus.processing,
+        path: updatedItems[i].path,
       );
       state = state.copyWith(items: List.from(updatedItems));
 
@@ -145,12 +172,14 @@ class LoteNotifier extends StateNotifier<LoteState> {
           updatedItems[i] = BatchItem(
             name: updatedItems[i].name,
             status: BatchItemStatus.done,
+            path: updatedItems[i].path,
           );
         } else {
           updatedItems[i] = BatchItem(
             name: updatedItems[i].name,
             status: BatchItemStatus.error,
             errorMessage: 'Conversión falló',
+            path: updatedItems[i].path,
           );
         }
       } catch (e) {
@@ -158,6 +187,7 @@ class LoteNotifier extends StateNotifier<LoteState> {
           name: updatedItems[i].name,
           status: BatchItemStatus.error,
           errorMessage: e.toString(),
+          path: updatedItems[i].path,
         );
       }
       state = state.copyWith(items: List.from(updatedItems));
@@ -166,12 +196,17 @@ class LoteNotifier extends StateNotifier<LoteState> {
     state = state.copyWith(isProcessing: false, results: results);
   }
 
-  /// Guarda todos los resultados en la galería del dispositivo.
+  /// Guarda todos los resultados en la galería del dispositivo. Devuelve
+  /// cuántos se guardaron; los que fallen no interrumpen al resto.
   Future<int> saveAllToGallery() async {
     var saved = 0;
     for (final file in state.results) {
-      await ImageGallerySaverPlus.saveFile(file.path);
-      saved++;
+      try {
+        await ImageGallerySaverPlus.saveFile(file.path);
+        saved++;
+      } catch (_) {
+        // Se omite el archivo que falló y se continúa con los demás.
+      }
     }
     return saved;
   }

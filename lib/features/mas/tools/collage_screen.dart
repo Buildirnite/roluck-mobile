@@ -1,13 +1,14 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/image_ops.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/utils/save_share.dart';
 import '../../../shared/widgets/image_viewer.dart';
+import '../../../shared/widgets/thumb_strip.dart';
 
 class CollageScreen extends StatefulWidget {
   const CollageScreen({super.key});
@@ -19,14 +20,26 @@ class CollageScreen extends StatefulWidget {
 class _CollageScreenState extends State<CollageScreen> {
   List<File> _images = [];
   int _cols = 2;
+  double _spacing = 8;
+  String _bg = 'white';
   bool _isProcessing = false;
   Uint8List? _result;
+
+  static const _bgOptions = {
+    'white': 'Blanco',
+    'black': 'Negro',
+    'transparent': 'Transparente',
+  };
 
   Future<void> _pickImages() async {
     final picker = ImagePicker();
     final picked = await picker.pickMultiImage();
     if (picked.isNotEmpty) {
-      setState(() => _images = picked.map((x) => File(x.path)).toList());
+      setState(() {
+        // Se agregan al final de la selección actual.
+        _images = [..._images, ...picked.map((x) => File(x.path))];
+        _result = null;
+      });
     }
   }
 
@@ -34,37 +47,24 @@ class _CollageScreenState extends State<CollageScreen> {
     if (_images.isEmpty) return;
     setState(() => _isProcessing = true);
 
-    final decoded = <img.Image>[];
+    final frames = <Uint8List>[];
     for (final f in _images) {
-      final bytes = await f.readAsBytes();
-      final d = img.decodeImage(bytes);
-      if (d != null) decoded.add(d);
+      frames.add(await f.readAsBytes());
     }
 
-    if (decoded.isEmpty) {
-      setState(() => _isProcessing = false);
-      return;
-    }
+    // Todo el trabajo pesado (decodificar, redimensionar, componer) ocurre en
+    // un isolate para no congelar la interfaz.
+    final result = await compute(collageOp, {
+      'frames': frames,
+      'cols': _cols,
+      'cellSize': 400,
+      'spacing': _spacing.round(),
+      'bg': _bg,
+    });
 
-    // Redimensionar todas al mismo tamaño
-    const cellSize = 400;
-    final resized = decoded.map((i) =>
-        img.copyResize(i, width: cellSize, height: cellSize)).toList();
-
-    final rows = (resized.length / _cols).ceil();
-    final canvas = img.Image(
-      width: cellSize * _cols,
-      height: cellSize * rows,
-    );
-
-    for (var i = 0; i < resized.length; i++) {
-      final x = (i % _cols) * cellSize;
-      final y = (i ~/ _cols) * cellSize;
-      img.compositeImage(canvas, resized[i], dstX: x, dstY: y);
-    }
-
+    if (!mounted) return;
     setState(() {
-      _result = Uint8List.fromList(img.encodePng(canvas));
+      _result = result.isEmpty ? null : result;
       _isProcessing = false;
     });
   }
@@ -83,9 +83,43 @@ class _CollageScreenState extends State<CollageScreen> {
               icon: const Icon(Icons.photo_library),
               label: Text(_images.isEmpty
                   ? 'Seleccionar imágenes'
-                  : '${_images.length} imágenes seleccionadas'),
+                  : 'Añadir más (${_images.length} elegidas)'),
             ),
             if (_images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Mantén pulsada una miniatura y arrástrala para reordenar',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _images = [];
+                      _result = null;
+                    }),
+                    child: const Text('Quitar todas',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ReorderableThumbStrip(
+                images: _images,
+                onReorder: (oldIndex, newIndex) => setState(() {
+                  final item = _images.removeAt(oldIndex);
+                  _images.insert(newIndex, item);
+                  _result = null;
+                }),
+                onRemove: (i) => setState(() {
+                  _images.removeAt(i);
+                  _result = null;
+                }),
+              ),
               const SizedBox(height: 16),
               Text('Columnas: $_cols',
                   style: const TextStyle(color: AppColors.textMuted)),
@@ -94,6 +128,47 @@ class _CollageScreenState extends State<CollageScreen> {
                 min: 1, max: 5, divisions: 4,
                 activeColor: AppColors.accent,
                 onChanged: (v) => setState(() => _cols = v.round()),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Espaciado',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  Text('${_spacing.round()} px',
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontFamily: 'monospace')),
+                ],
+              ),
+              Slider(
+                value: _spacing,
+                min: 0, max: 40, divisions: 20,
+                activeColor: AppColors.accent,
+                inactiveColor: AppColors.bgElevated,
+                label: '${_spacing.round()}',
+                onChanged: (v) => setState(() => _spacing = v),
+              ),
+              const Text('Fondo',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: _bgOptions.entries.map((e) {
+                  final selected = _bg == e.key;
+                  return ChoiceChip(
+                    label: Text(e.value),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _bg = e.key),
+                    selectedColor: AppColors.accentDim,
+                    backgroundColor: AppColors.bgElevated,
+                    labelStyle: TextStyle(
+                        color: selected
+                            ? AppColors.accent
+                            : AppColors.textPrimary,
+                        fontSize: 12),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -117,12 +192,17 @@ class _CollageScreenState extends State<CollageScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         final scaffold = ScaffoldMessenger.of(context);
-                        final file =
-                            await ImageUtils.saveTempFile(_result!, 'png');
-                        await ImageGallerySaverPlus.saveFile(file.path);
-                        if (mounted) {
+                        try {
+                          final file =
+                              await ImageUtils.saveTempFile(_result!, 'png');
+                          await ImageGallerySaverPlus.saveFile(file.path);
                           scaffold.showSnackBar(
                             const SnackBar(content: Text('Collage guardado')),
+                          );
+                        } catch (_) {
+                          scaffold.showSnackBar(
+                            const SnackBar(
+                                content: Text('No se pudo guardar')),
                           );
                         }
                       },

@@ -17,6 +17,8 @@ class ConvertirState {
   final File? resultFile;
   final int? originalSize;
   final int? resultSize;
+  // Mensaje de error de la última conversión (null si fue bien).
+  final String? error;
 
   const ConvertirState({
     this.inputFile,
@@ -27,6 +29,7 @@ class ConvertirState {
     this.resultFile,
     this.originalSize,
     this.resultSize,
+    this.error,
   });
 
   ConvertirState copyWith({
@@ -38,6 +41,8 @@ class ConvertirState {
     File? resultFile,
     int? originalSize,
     int? resultSize,
+    String? error,
+    bool clearError = false,
   }) {
     return ConvertirState(
       inputFile: inputFile ?? this.inputFile,
@@ -48,6 +53,7 @@ class ConvertirState {
       resultFile: resultFile ?? this.resultFile,
       originalSize: originalSize ?? this.originalSize,
       resultSize: resultSize ?? this.resultSize,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
@@ -66,7 +72,7 @@ class ConvertirNotifier extends StateNotifier<ConvertirState> {
 
   Future<void> convert() async {
     if (state.inputFile == null) return;
-    state = state.copyWith(isConverting: true, resultFile: null);
+    state = state.copyWith(isConverting: true, clearError: true);
 
     try {
       final input = state.inputFile!;
@@ -134,9 +140,17 @@ class ConvertirNotifier extends StateNotifier<ConvertirState> {
           resultFile: resultFile,
           resultSize: bytes.length,
         );
+      } else {
+        state = state.copyWith(
+          isConverting: false,
+          error: 'No se pudo convertir la imagen. Prueba con otro formato.',
+        );
       }
     } catch (_) {
-      state = state.copyWith(isConverting: false);
+      state = state.copyWith(
+        isConverting: false,
+        error: 'No se pudo convertir la imagen. Prueba con otro formato.',
+      );
     }
   }
 }

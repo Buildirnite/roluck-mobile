@@ -48,3 +48,8 @@ android/build/
 # Archivos temporales y de error
 build_error.txt
 *.iml
+
+# Firma — nunca subir a git
+android/key.properties
+*.keystore
+*.jks

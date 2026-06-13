@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/colors.dart';
+import '../../core/utils/pick_image.dart';
 import '../../shared/widgets/image_picker_zone.dart';
 import '../../shared/widgets/result_card.dart';
 import 'convertir_provider.dart';
@@ -37,7 +38,10 @@ class ConvertirScreen extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => notifier.setInput(state.inputFile!),
+                  onPressed: () async {
+                    final file = await pickImageWithSheet(context);
+                    if (file != null) notifier.setInput(file);
+                  },
                   child: const Text('Cambiar imagen',
                       style: TextStyle(color: AppColors.accent)),
                 ),
@@ -84,9 +88,9 @@ class ConvertirScreen extends ConsumerWidget {
                 ),
                 Slider(
                   value: state.quality.toDouble(),
-                  min: 0,
+                  min: 1,
                   max: 100,
-                  divisions: 100,
+                  divisions: 99,
                   activeColor: AppColors.accent,
                   inactiveColor: AppColors.bgElevated,
                   onChanged: (v) => notifier.setQuality(v.round()),
@@ -136,6 +140,16 @@ class ConvertirScreen extends ConsumerWidget {
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 16),
+
+              // Error de la última conversión
+              if (state.error != null) ...[
+                Text(
+                  state.error!,
+                  style: const TextStyle(color: AppColors.error, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Resultado
               if (state.resultFile != null)

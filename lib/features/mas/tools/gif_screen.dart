@@ -8,6 +8,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/utils/image_ops.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../shared/widgets/image_viewer.dart';
+import '../../../shared/widgets/thumb_strip.dart';
 
 /// Crea un GIF animado a partir de varias imágenes seleccionadas, en el orden
 /// en que se eligieron, con una velocidad ajustable.
@@ -29,7 +30,8 @@ class _GifScreenState extends State<GifScreen> {
     final picked = await picker.pickMultiImage();
     if (picked.isNotEmpty) {
       setState(() {
-        _images = picked.map((x) => File(x.path)).toList();
+        // Se agregan al final de la selección actual.
+        _images = [..._images, ...picked.map((x) => File(x.path))];
         _result = null;
       });
     }
@@ -91,23 +93,43 @@ class _GifScreenState extends State<GifScreen> {
               icon: const Icon(Icons.photo_library),
               label: Text(_images.isEmpty
                   ? 'Seleccionar imágenes'
-                  : '${_images.length} imágenes seleccionadas'),
+                  : 'Añadir más (${_images.length} elegidas)'),
             ),
             if (_images.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              // Tira de miniaturas en el orden de la animación.
-              SizedBox(
-                height: 72,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _images.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, i) => ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(_images[i],
-                        width: 72, height: 72, fit: BoxFit.cover),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Mantén pulsado un cuadro y arrástralo para reordenar',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
                   ),
-                ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _images = [];
+                      _result = null;
+                    }),
+                    child: const Text('Quitar todas',
+                        style: TextStyle(
+                            color: AppColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // Cuadros de la animación: reordenables y con ✕ para quitar.
+              ReorderableThumbStrip(
+                images: _images,
+                onReorder: (oldIndex, newIndex) => setState(() {
+                  final item = _images.removeAt(oldIndex);
+                  _images.insert(newIndex, item);
+                  _result = null;
+                }),
+                onRemove: (i) => setState(() {
+                  _images.removeAt(i);
+                  _result = null;
+                }),
               ),
               const SizedBox(height: 16),
               Text('Velocidad: ${_delayMs.round()} ms por cuadro',

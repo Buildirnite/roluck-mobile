@@ -17,7 +17,7 @@ const _tools = [
   _ToolItem(EditorTool.flip, Icons.flip, 'Voltear'),
   _ToolItem(EditorTool.filters, Icons.auto_awesome, 'Filtros'),
   _ToolItem(EditorTool.adjust, Icons.tune, 'Ajustes'),
-  _ToolItem(EditorTool.effects, Icons.auto_fix_high, 'Efectos'),
+  _ToolItem(EditorTool.effects, Icons.grain, 'Efectos'),
   _ToolItem(EditorTool.frame, Icons.crop_din, 'Marco'),
   _ToolItem(EditorTool.resize, Icons.aspect_ratio, 'Redimensionar'),
   _ToolItem(EditorTool.watermark, Icons.branding_watermark, 'Marca de agua'),
